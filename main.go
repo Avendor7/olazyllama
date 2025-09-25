@@ -1,3 +1,5 @@
+// Package main provides a terminal-based GUI application for managing Ollama models.
+// It displays installed and running models in a split-pane interface with status updates.
 package main
 
 import (
@@ -12,23 +14,28 @@ import (
 	"olazyllama/internal/ollama"
 )
 
+// View names for the GUI layout
 const (
-	viewInstalled = "installed"
-	viewRunning   = "running"
-	viewStatus    = "status"
+	viewInstalled = "installed" // Left pane showing installed models
+	viewRunning   = "running"   // Right pane showing running models
+	viewStatus    = "status"    // Bottom pane showing status messages
 )
 
+// App represents the main application state and GUI components.
+// It manages the terminal interface, Ollama client connection, and model data.
 type App struct {
-	gui     *gocui.Gui
-	client  *ollama.Client
-	baseURL string
+	gui     *gocui.Gui     // Terminal GUI instance
+	client  *ollama.Client // Ollama API client
+	baseURL string         // Base URL for Ollama server
 
-	installed []ollama.Model
-	running   []ollama.Model
+	installed []ollama.Model // List of locally installed models
+	running   []ollama.Model // List of currently running models
 
-	statusLines []string
+	statusLines []string // Recent status messages for display
 }
 
+// newApp creates a new App instance with the specified Ollama server URL.
+// If baseURL is empty, it defaults to the standard Ollama localhost address.
 func newApp(baseURL string) *App {
 	return &App{
 		client:  ollama.NewClient(baseURL),
@@ -36,6 +43,8 @@ func newApp(baseURL string) *App {
 	}
 }
 
+// logf logs a formatted message to the status view.
+// Messages are stored in a rolling buffer of the last 5 lines.
 func (a *App) logf(format string, args ...any) {
 	line := fmt.Sprintf(format, args...)
 	a.statusLines = append(a.statusLines, line)
@@ -51,6 +60,8 @@ func (a *App) logf(format string, args ...any) {
 	})
 }
 
+// safeUpdate safely executes a GUI update function if the GUI is initialized.
+// This prevents panics when trying to update the GUI before it's ready.
 func (a *App) safeUpdate(fn func(*gocui.Gui) error) {
 	if a.gui == nil {
 		return
@@ -58,6 +69,8 @@ func (a *App) safeUpdate(fn func(*gocui.Gui) error) {
 	a.gui.Update(fn)
 }
 
+// layout sets up the GUI layout with three views: installed models (left),
+// running models (right), and status messages (bottom).
 func (a *App) layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 	statusH := 2
@@ -97,6 +110,8 @@ func (a *App) layout(g *gocui.Gui) error {
 	return nil
 }
 
+// drawInstalled updates the installed models view with the current list.
+// Shows model names and sizes in a formatted display.
 func (a *App) drawInstalled() {
 	a.safeUpdate(func(g *gocui.Gui) error {
 		v, err := g.View(viewInstalled)
@@ -119,6 +134,7 @@ func (a *App) drawInstalled() {
 	})
 }
 
+// drawRunning updates the running models view with currently active models.
 func (a *App) drawRunning() {
 	a.safeUpdate(func(g *gocui.Gui) error {
 		v, err := g.View(viewRunning)
@@ -137,6 +153,8 @@ func (a *App) drawRunning() {
 	})
 }
 
+// refreshAll fetches the latest model data from Ollama in a background goroutine.
+// Updates both installed and running model lists with error handling.
 func (a *App) refreshAll() {
 	a.logf("Refreshing...")
 	go func() {
@@ -167,6 +185,8 @@ func (a *App) refreshAll() {
 	}()
 }
 
+// bindKeys sets up keyboard shortcuts for the application.
+// Supports Ctrl+C, q (quit), r, and Ctrl+R (refresh).
 func (a *App) bindKeys() error {
 	if err := a.gui.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, a.onQuit); err != nil {
 		return err
@@ -183,15 +203,19 @@ func (a *App) bindKeys() error {
 	return nil
 }
 
+// onQuit handles the quit key binding and terminates the application.
 func (a *App) onQuit(_ *gocui.Gui, _ *gocui.View) error {
 	return gocui.ErrQuit
 }
 
+// onRefresh handles the refresh key binding and triggers a data refresh.
 func (a *App) onRefresh(_ *gocui.Gui, _ *gocui.View) error {
 	a.refreshAll()
 	return nil
 }
 
+// main initializes and runs the Ollama model manager GUI application.
+// Sets up the terminal interface, binds keyboard shortcuts, and starts the main loop.
 func main() {
 	app := newApp("http://localhost:11434")
 
